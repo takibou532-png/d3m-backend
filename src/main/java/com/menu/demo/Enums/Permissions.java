@@ -1,0 +1,32 @@
+package com.menu.demo.Enums;
+
+public enum Permissions {
+    // ===== PUBLIC =====
+    VIEW_PUBLIC_SCHOOL,
+    VIEW_PUBLIC_SESSIONS,
+
+    // ===== STUDENT =====
+    VIEW_OWN_SCHEDULE,
+    VIEW_OWN_ATTENDANCE,
+    VIEW_OWN_INVOICES,
+
+    // ===== TEACHER =====
+    VIEW_ASSIGNED_CLASSES,
+    MANAGE_ATTENDANCE,
+    VIEW_TEACHER_SCHEDULE,
+
+    // ===== SCHOOL ADMIN =====
+    MANAGE_STUDENTS,
+    MANAGE_TEACHERS,
+    MANAGE_CLASSES,
+    MANAGE_COURSES,
+    MANAGE_SESSIONS,
+    MANAGE_FINANCE,
+    APPROVE_STUDENT_REQUEST,
+
+    // ===== SUPER ADMIN =====
+    APPROVE_SCHOOL_REQUEST,
+    MANAGE_SUBSCRIPTIONS,
+    VIEW_ALL_SCHOOLS
+
+}
