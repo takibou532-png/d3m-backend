@@ -1,5 +1,6 @@
 package com.menu.demo.Models;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import jakarta.persistence.Column;
@@ -42,5 +43,8 @@ public class TeacherProfile {
 
     @Column(length = 500)
     private String bio;
+    @Column(nullable = false)
+    @Builder.Default
+    private BigDecimal percentage = BigDecimal.ZERO;
 }
 

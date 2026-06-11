@@ -1,5 +1,7 @@
 package com.menu.demo.Controllers;
 
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -24,9 +26,13 @@ public class SchoolController {
     private final SchoolService schoolService;
 
     // Super admin views all schools (paginated, excludes EXPIRED)
-    @GetMapping
+    @GetMapping("/all")
     public ResponseEntity<Page<SchoolResponseDto>> getAll(Pageable pageable) {
         return ResponseEntity.ok(schoolService.getAllSchools(pageable));
+    }
+    @GetMapping
+    public ResponseEntity<List<SchoolResponseDto>> getAllActive() {
+        return ResponseEntity.ok(schoolService.getAllActiveSchools());
     }
 
     // Get one school by ID

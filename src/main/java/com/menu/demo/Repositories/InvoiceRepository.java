@@ -16,6 +16,7 @@ import com.menu.demo.Models.Enrollment;
 import com.menu.demo.Models.Invoice;
 import com.menu.demo.Models.School;
 import com.menu.demo.Models.StudentProfile;
+import com.menu.demo.Models.TeacherProfile;
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
@@ -69,5 +70,16 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
         AND i.status = 'PAID'
     """)
     BigDecimal sumAllPaidBySchool(@Param("school") School school);
+    @Query("""
+    	    SELECT COALESCE(SUM(i.totalAmount), 0)
+    	    FROM Invoice i
+    	    WHERE i.enrollment.module.teacher = :teacher
+    	    AND i.period = :period
+    	    AND i.status = 'PAID'
+    	""")
+    	BigDecimal sumPaidByTeacherAndPeriod(
+    	    @Param("teacher") TeacherProfile teacher,
+    	    @Param("period") YearMonth period
+    	);
 
 }

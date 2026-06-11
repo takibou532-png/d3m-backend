@@ -4,7 +4,7 @@ package com.menu.demo.Services;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
-
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,6 +51,14 @@ public class SchoolService {
             .findAllBySubscriptionStatusNot(SubscriptionStatus.EXPIRED, pageable)
             .map(this::mapSchoolToResponse);
     }
+    
+    public List<SchoolResponseDto> getAllActiveSchools() {
+        return schoolRepository
+            .findAllBySubscriptionStatus(SubscriptionStatus.ACTIVE).stream()
+            .map(this::mapSchoolToResponse)
+            .toList();
+    }
+
 
     // ======== GET ONE SCHOOL ========
 

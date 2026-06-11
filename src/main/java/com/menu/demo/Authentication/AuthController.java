@@ -63,16 +63,20 @@ public class AuthController {
         // 4️⃣ Return token ( set in cookie)
         String cookie = String.format(
                 "refreshToken=%s; HttpOnly; Path=/; Max-Age=%d; SameSite=None; Secure",
-                refreshToken, 7 * 24 * 60 * 60
+                refreshToken, 30 * 24 * 60 * 60
             );
         
             response.addHeader("Set-Cookie", cookie);
 
-        return ResponseEntity.ok(Map.of("AccessToken",accessToken));
+            return ResponseEntity.ok(Map.of("accessToken", accessToken));
     }
     // ========================= Refresh =====================
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(HttpServletRequest request) {
+
+        if (request.getCookies() == null) {
+            return ResponseEntity.status(403).body("No refresh token found");
+        }
 
         String refreshToken = Arrays.stream(request.getCookies())
                 .filter(c -> c.getName().equals("refreshToken"))
@@ -92,10 +96,7 @@ public class AuthController {
         }
 
         String newAccessToken = jwtutil.generateAccessToken(user);
-
-        return ResponseEntity.ok(
-                Map.of("accessToken", newAccessToken)
-        );
+        return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
     }
 
     

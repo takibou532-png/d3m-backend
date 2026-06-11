@@ -33,7 +33,7 @@ public class TeacherController {
     private final SchoolAdminProfileRepository adminProfileRepository;
 
     // School admin creates a teacher
-    @PostMapping
+    @PostMapping("/create")
     public ResponseEntity<TeacherResponseDto> create(
             @RequestBody TeacherRequestDto request,
             @AuthenticationPrincipal User currentUser) throws Exception {

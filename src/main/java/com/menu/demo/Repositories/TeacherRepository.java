@@ -1,5 +1,6 @@
 package com.menu.demo.Repositories;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,4 +16,6 @@ public interface TeacherRepository extends JpaRepository<TeacherProfile, Long>{
 	  Optional<TeacherProfile> findByUser(User user);
       List<TeacherProfile> findAllBySchool(School school);
       long countBySchool(School school);
+      List<TeacherProfile> findAllBySchoolAndArchivedFalse(School school);
+      List<TeacherProfile> findAllByArchivedFalseAndPercentageGreaterThan(BigDecimal percentage);
 }

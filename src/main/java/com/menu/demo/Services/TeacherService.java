@@ -1,6 +1,7 @@
 package com.menu.demo.Services;
 
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.apache.coyote.BadRequestException;
@@ -86,7 +87,7 @@ public class TeacherService {
 
    
     
-     // the exception is frome tomcat and must be costum     
+       
     //========================== Create Teacher Profile ================================
     @Transactional
     public ResponseEntity<TeacherResponseDto> creacteTeacherProfile(TeacherRequestDto request,SchoolAdminProfile currentUser)  {
@@ -107,11 +108,16 @@ public class TeacherService {
     			.fullName(request.getFullName())
     			.password(passwordEncoder.encode(request.getPassword())).role(Role.TEACHER).build();
     	 userRepository.save(user);
-    	TeacherProfile profile=TeacherProfile.builder().user(user).specialization(request.getSpecialization())
-    			.bio(request.getBio())
-    			.school(shcool)
-    			.archived(false)
-    			.build();
+    	 TeacherProfile profile = TeacherProfile.builder()
+    			    .user(user)
+    			    .school(currentUser.getSchool())
+    			    .specialization(request.getSpecialization())
+    			    .bio(request.getBio())
+    			    .percentage(request.getPercentage() != null
+    			        ? request.getPercentage()
+    			        : BigDecimal.ZERO)           
+    			    .archived(false)
+    			    .build();
     	teacherRepository.save(profile);
     	return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(profile));
     			
