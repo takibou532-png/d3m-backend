@@ -176,7 +176,7 @@ public class TeacherService {
                 .email(profile.getUser().getEmail())
                  .bio(profile.getBio())
                 .specialization(profile.getSpecialization())
-                
+                 
                 .build();
     }
 

@@ -1,5 +1,7 @@
 package com.menu.demo.Services;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -14,6 +16,7 @@ import com.menu.demo.Enums.SubscriptionStatus;
 import com.menu.demo.Exceptions.ResourceNotFoundException;
 import com.menu.demo.Models.CourseModule;
 import com.menu.demo.Models.Enrollment;
+import com.menu.demo.Models.School;
 import com.menu.demo.Models.SchoolAdminProfile;
 import com.menu.demo.Models.Session;
 import com.menu.demo.Models.StudentProfile;
@@ -28,6 +31,7 @@ import com.menu.demo.Repositories.StudentRequestRepository;
 
 import Dto.EnrollmentResponseDto;
 import Dto.StudentEnrollmentRequestDto;
+import Dto.StudentRequestResponseDto;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -149,7 +153,76 @@ public List<EnrollmentResponseDto> getMyEnrollments(User currentUser) {
 
 
 
+//===== SCHOOL ADMIN — view all requests (filterable by status) =====
 
+public Page<StudentRequestResponseDto> getSchoolRequests(
+     EnrollmentStatus status,
+     Pageable pageable,
+     SchoolAdminProfile admin) {
+
+ School school = admin.getSchool();
+
+ Page<StudentRequest> requests = (status != null)
+     ? studentRequestRepository.findBySchoolAndStatus(school, status, pageable)
+     : studentRequestRepository.findAllBySchool(school, pageable);
+
+ return requests.map(this::mapRequestToResponse);
+}
+
+//===== SCHOOL ADMIN — view requests for a specific module =====
+
+public List<StudentRequestResponseDto> getRequestsByModule(
+     Long moduleId,
+     EnrollmentStatus status,
+     SchoolAdminProfile admin) {
+
+ CourseModule module = moduleRepository.findById(moduleId)
+     .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + moduleId));
+
+ if (!module.getSchool().getId().equals(admin.getSchool().getId()))
+     throw new AccessDeniedException("Module does not belong to your school");
+
+ List<StudentRequest> requests = (status != null)
+     ? studentRequestRepository.findByModuleAndStatus(module, status)
+     : studentRequestRepository.findByModuleAndStatus(module, EnrollmentStatus.PENDING);
+
+ return requests.stream().map(this::mapRequestToResponse).toList();
+}
+
+//===== SCHOOL ADMIN — count pending requests (dashboard badge) =====
+
+public long countPendingRequests(SchoolAdminProfile admin) {
+ return studentRequestRepository.countPendingBySchool(admin.getSchool());
+}
+
+//===== MAPPING =====
+
+private StudentRequestResponseDto mapRequestToResponse(StudentRequest sr) {
+ StudentProfile student = sr.getStudent();
+ CourseModule module = sr.getModule();
+
+ return StudentRequestResponseDto.builder()
+     .id(sr.getId())
+     // student
+     .studentId(student.getId())
+     .studentFullName(student.getUser().getFullName())
+     .studentEmail(student.getUser().getEmail())
+     .studentLevel(student.getLevel())
+     .parentName(student.getParentName())
+     .parentPhone(student.getParentPhone())
+     // module
+     .moduleId(module.getId())
+     .moduleName(module.getName())
+     .subjectName(module.getSubject().getName())
+     .level(module.getLevel())
+     .monthlyPrice(module.getMonthlyprice())
+     // request
+     .status(sr.getStatus())
+     .createdAt(sr.getCreatedAt())
+     .reviewedAt(sr.getReviewedAt())
+     .reviewComment(sr.getReviewComment())
+     .build();
+}
 	    /* =========================================================
 	       4) STUDENT CANCEL
 	       ========================================================= */
