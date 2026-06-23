@@ -76,4 +76,19 @@ public class TeacherController {
         return adminProfileRepository.findByUser(user)
             .orElseThrow(() -> new ResourceNotFoundException("Admin profile not found"));
     }
+    // GET /api/teachers/archived
+@GetMapping("/archived")
+public ResponseEntity<List<TeacherResponseDto>> getArchived(
+        @AuthenticationPrincipal User currentUser) {
+    return ResponseEntity.ok(teacherService.getArchivedTeachers(resolveAdmin(currentUser)));
+}
+
+// PATCH /api/teachers/{id}/unarchive
+@PatchMapping("/{id}/unarchive")
+public ResponseEntity<Void> unarchive(
+        @PathVariable Long id,
+        @AuthenticationPrincipal User currentUser) {
+    teacherService.unarchiveTeacher(id, resolveAdmin(currentUser));
+    return ResponseEntity.noContent().build();
+}
 }

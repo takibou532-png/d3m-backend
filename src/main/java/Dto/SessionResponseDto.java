@@ -16,5 +16,6 @@ public class SessionResponseDto {
     private LocalDate date;
     private LocalTime startTime;
     private LocalTime endTime;
-    private boolean isArchived;
+    private boolean Archived;
+    
 }

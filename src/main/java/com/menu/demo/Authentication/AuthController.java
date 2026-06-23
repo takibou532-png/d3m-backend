@@ -1,6 +1,7 @@
 package com.menu.demo.Authentication;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.menu.demo.Exceptions.ResourceNotFoundException;
 import com.menu.demo.Models.User;
+import com.menu.demo.Repositories.SchoolAdminProfileRepository;
+import com.menu.demo.Repositories.TeacherRepository;
 import com.menu.demo.Repositories.UserRepository;
 import com.menu.demo.SecurityJwt.JwtUtill;
 import com.menu.demo.Services.UserService;
@@ -41,35 +44,35 @@ public class AuthController {
     private final UserRepository userRepository;
     private final JwtUtill jwtutil;
     private final PasswordEncoder passwordEncoder;
+    private final SchoolAdminProfileRepository schoolAdminProfileRepository;
+    private final TeacherRepository teacherRepository;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthenticationRequest loginRequest,HttpServletResponse response) {
-        // 1️⃣ Authenticate credentials
+    public ResponseEntity<?> login(@RequestBody AuthenticationRequest loginRequest, HttpServletResponse response) {
         try {
             UsernamePasswordAuthenticationToken authInputToken =
                     new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword());
             authenticationManager.authenticate(authInputToken);
         } catch (Exception e) {
-            e.printStackTrace();  // <-- log the reason
+            e.printStackTrace();
             return ResponseEntity.status(403).body("Login failed: " + e.getMessage());
         }
 
-       
         UserDetails userDetails = userService.loadUserByUsername(loginRequest.getEmail());
 
-        // 3️⃣ Generate JWT tokens
         String accessToken = jwtutil.generateAccessToken(userDetails);
         String refreshToken = jwtutil.generateRefreshToken(userDetails);
-        // 4️⃣ Return token ( set in cookie)
+
         String cookie = String.format(
                 "refreshToken=%s; HttpOnly; Path=/; Max-Age=%d; SameSite=None; Secure",
                 refreshToken, 30 * 24 * 60 * 60
-            );
-        
-            response.addHeader("Set-Cookie", cookie);
+        );
 
-            return ResponseEntity.ok(Map.of("accessToken", accessToken));
+        response.addHeader("Set-Cookie", cookie);
+
+        return ResponseEntity.ok(Map.of("accessToken", accessToken));
     }
+
     // ========================= Refresh =====================
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(HttpServletRequest request) {
@@ -99,8 +102,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
     }
 
-    
-    //==============  Change password  ======================= 
+    // ==============  Change password  =======================
     @PutMapping("/change-password")
     public ResponseEntity<?> changePassword(
             @RequestBody ChangePassword request,
@@ -110,25 +112,19 @@ public class AuthController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        // 1) verify old password
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Old password is incorrect");
         }
 
-        // 2) encode new password
         String encodedNew = passwordEncoder.encode(request.getNewPassword());
-
-        // 3) save new password
         user.setPassword(encodedNew);
-       userRepository.save(user);
+        userRepository.save(user);
 
         return ResponseEntity.ok("Password updated successfully");
-    }     
-    
-    
-    
-    //======================= Log Out ============================
+    }
+
+    // ======================= Log Out ============================
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
 
@@ -140,23 +136,30 @@ public class AuthController {
         return ResponseEntity.ok("Logged out");
     }
 
-
-
- // ================================= me function ==============================================
+    // ================================= Me =============================================
     @GetMapping("/me")
     public ResponseEntity<?> getUserInfo(Authentication auth) {
         String email = auth.getName();
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return ResponseEntity.ok(Map.of(
-            "id",       user.getId(),
-            "fullName", user.getFullName(),
-            "email",    user.getEmail(),
-            "role",     user.getRole()
-            
-        ));
+        HashMap<String, Object> info = new HashMap<>();
+        info.put("id",       user.getId());
+        info.put("fullName", user.getFullName());
+        info.put("email",    user.getEmail());
+        info.put("role",     user.getRole());
+
+        switch (user.getRole().name()) {
+            case "SCHOOL_ADMIN" ->
+                schoolAdminProfileRepository.findByUser(user).ifPresent(profile ->
+                    info.put("schoolId", profile.getSchool().getId())
+                );
+            case "TEACHER" ->
+                teacherRepository.findByUser(user).ifPresent(profile ->
+                    info.put("schoolId", profile.getSchool().getId())
+                );
+        }
+
+        return ResponseEntity.ok(info);
     }
-
-
 }

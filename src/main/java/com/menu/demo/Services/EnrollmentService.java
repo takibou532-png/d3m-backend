@@ -39,230 +39,219 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class EnrollmentService {
-	
-	 private final EnrollmentRepository enrollmentRepository;
-	  
-	    private final StudentRepository studentProfileRepository;
-	    private final CourseModuleRepository moduleRepository;
-	   
-	    private final StudentRequestRepository studentRequestRepository;
 
-//      send request to a school 
-	    
-public void requestEnrollment(StudentEnrollmentRequestDto request, User currentUser) {
+    private final EnrollmentRepository enrollmentRepository;
+    private final StudentRepository studentProfileRepository;
+    private final CourseModuleRepository moduleRepository;
+    private final StudentRequestRepository studentRequestRepository;
 
-    StudentProfile student = studentProfileRepository.findByUser(currentUser)
-        .orElseThrow(() -> new ResourceNotFoundException("Student profile not found"));
+    // ===== STUDENT SENDS ENROLLMENT REQUEST =====
 
-    CourseModule module = moduleRepository.findById(request.getModuleId())
-        .orElseThrow(() -> new ResourceNotFoundException("Module not found"));
+    public void requestEnrollment(StudentEnrollmentRequestDto request, User currentUser) {
 
-    if (module.isArchived())
-        throw new IllegalStateException("This module is no longer available");
+        StudentProfile student = studentProfileRepository.findByUser(currentUser)
+            .orElseThrow(() -> new ResourceNotFoundException("Student profile not found"));
 
-    // Already requested or enrolled?
-    if (studentRequestRepository.existsByStudentAndModuleAndStatus(
-            student, module, EnrollmentStatus.PENDING))
-        throw new IllegalStateException("You already have a pending request for this module");
+        CourseModule module = moduleRepository.findById(request.getModuleId())
+            .orElseThrow(() -> new ResourceNotFoundException("Module not found"));
 
-    if (enrollmentRepository.findByStudentAndModule(student, module)
-            .filter(e -> e.getStatus() == EnrollmentStatus.ACCEPTED)
-            .isPresent())
-        throw new IllegalStateException("You are already enrolled in this module");
+        if (module.isArchived())
+            throw new IllegalStateException("This module is no longer available");
 
-    // Check module capacity
-    long enrolled = enrollmentRepository.countActiveByModule(module);
-    if (enrolled >= module.getMaxStudents())
-        throw new IllegalStateException("This module is full");
+        // Already requested or enrolled?
+        if (studentRequestRepository.existsByStudentAndModuleAndStatus(
+                student, module, EnrollmentStatus.PENDING))
+            throw new IllegalStateException("You already have a pending request for this module");
 
-    StudentRequest studentRequest = StudentRequest.builder()
-        .student(student)
-        .module(module)
-       
-        .status(EnrollmentStatus.PENDING)
-        .build();
+        // FIX: check for ACTIVE (not ACCEPTED) since approved enrollments are saved as ACTIVE
+        if (enrollmentRepository.findByStudentAndModule(student, module)
+                .filter(e -> e.getStatus() == EnrollmentStatus.ACTIVE)
+                .isPresent())
+            throw new IllegalStateException("You are already enrolled in this module");
 
-    studentRequestRepository.save(studentRequest);
-}
+        // Check module capacity
+        long enrolled = enrollmentRepository.countActiveByModule(module);
+        if (enrolled >= module.getMaxStudents())
+            throw new IllegalStateException("This module is full");
 
+        StudentRequest studentRequest = StudentRequest.builder()
+            .student(student)
+            .module(module)
+            .status(EnrollmentStatus.PENDING)
+            .build();
 
+        studentRequestRepository.save(studentRequest);
+    }
 
-public void approveEnrollment(Long requestId, SchoolAdminProfile admin) throws AccessDeniedException {
+    // ===== SCHOOL ADMIN APPROVES REQUEST =====
 
-    StudentRequest request = studentRequestRepository.findById(requestId)
-        .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+    public void approveEnrollment(Long requestId, SchoolAdminProfile admin) throws AccessDeniedException {
 
-    if (!request.getModule().getSchool().getId().equals(admin.getSchool().getId()))
-        throw new AccessDeniedException("Not your school");
+        StudentRequest request = studentRequestRepository.findById(requestId)
+            .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
-    if (request.getStatus() != EnrollmentStatus.PENDING)
-        throw new IllegalStateException("Request is not pending");
+        if (!request.getModule().getSchool().getId().equals(admin.getSchool().getId()))
+            throw new AccessDeniedException("Not your school");
 
-    // Final capacity check
-    long enrolled = enrollmentRepository.countActiveByModule(request.getModule());
-    if (enrolled >= request.getModule().getMaxStudents())
-        throw new IllegalStateException("Module is full");
+        if (request.getStatus() != EnrollmentStatus.PENDING)
+            throw new IllegalStateException("Request is not pending");
 
-    // Create enrollment
-    Enrollment enrollment = Enrollment.builder()
-        .student(request.getStudent())
-        .module(request.getModule())
-        .status(EnrollmentStatus.ACCEPTED)
-        .startDate(LocalDate.now())
-        .endDate(request.getModule().getPeriodEnd())
-        .monthlyPrice(request.getModule().getMonthlyprice())
-        .build();
+        // Final capacity check
+        long enrolled = enrollmentRepository.countActiveByModule(request.getModule());
+        if (enrolled >= request.getModule().getMaxStudents())
+            throw new IllegalStateException("Module is full");
 
-    enrollmentRepository.save(enrollment);
+        // FIX: save enrollment as ACTIVE so findActiveStudentsByModuleId can find it
+        Enrollment enrollment = Enrollment.builder()
+            .student(request.getStudent())
+            .module(request.getModule())
+            .status(EnrollmentStatus.ACTIVE)
+            .startDate(LocalDate.now())
+            .endDate(request.getModule().getPeriodEnd())
+            .monthlyPrice(request.getModule().getMonthlyprice())
+            .build();
 
-    // Update request status
-    request.setStatus(EnrollmentStatus.ACCEPTED);
-    request.setReviewedAt(LocalDateTime.now());
-    studentRequestRepository.save(request);
-}
+        enrollmentRepository.save(enrollment);
 
-// ===== SCHOOL ADMIN REJECTS REQUEST =====
+        // Update request status — this is the StudentRequest row, stays ACCEPTED
+        request.setStatus(EnrollmentStatus.ACCEPTED);
+        request.setReviewedAt(LocalDateTime.now());
+        studentRequestRepository.save(request);
+    }
 
-public void rejectEnrollment(Long requestId, String comment, SchoolAdminProfile admin) throws AccessDeniedException {
+    // ===== SCHOOL ADMIN REJECTS REQUEST =====
 
-    StudentRequest request = studentRequestRepository.findById(requestId)
-        .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+    public void rejectEnrollment(Long requestId, String comment, SchoolAdminProfile admin) throws AccessDeniedException {
 
-    if (!request.getModule().getSchool().getId().equals(admin.getSchool().getId()))
-        throw new AccessDeniedException("Not your school");
+        StudentRequest request = studentRequestRepository.findById(requestId)
+            .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
-    request.setStatus(EnrollmentStatus.REJECTED);
-    request.setReviewedAt(LocalDateTime.now());
-    request.setReviewComment(comment);
-    studentRequestRepository.save(request);
-}
+        if (!request.getModule().getSchool().getId().equals(admin.getSchool().getId()))
+            throw new AccessDeniedException("Not your school");
 
-// ===== STUDENT VIEWS THEIR ENROLLMENTS =====
+        request.setStatus(EnrollmentStatus.REJECTED);
+        request.setReviewedAt(LocalDateTime.now());
+        request.setReviewComment(comment);
+        studentRequestRepository.save(request);
+    }
 
-public List<EnrollmentResponseDto> getMyEnrollments(User currentUser) {
+    // ===== STUDENT VIEWS THEIR OWN ENROLLMENTS =====
 
-    StudentProfile student = studentProfileRepository.findByUser(currentUser)
-        .orElseThrow(() -> new ResourceNotFoundException("Student profile not found"));
+    public List<EnrollmentResponseDto> getMyEnrollments(User currentUser) {
 
-    return enrollmentRepository
-        .findAllByStudentAndStatus(student, EnrollmentStatus.ACCEPTED)
-        .stream()
-        .map(this::mapToResponse)
-        .toList();
-}
+        StudentProfile student = studentProfileRepository.findByUser(currentUser)
+            .orElseThrow(() -> new ResourceNotFoundException("Student profile not found"));
 
+        // FIX: query ACTIVE (not ACCEPTED) to match what approveEnrollment saves
+        return enrollmentRepository
+            .findAllByStudentAndStatus(student, EnrollmentStatus.ACTIVE)
+            .stream()
+            .map(this::mapToResponse)
+            .toList();
+    }
 
+    // ===== SCHOOL ADMIN — view all requests (filterable by status) =====
 
-//===== SCHOOL ADMIN — view all requests (filterable by status) =====
+    public Page<StudentRequestResponseDto> getSchoolRequests(
+            EnrollmentStatus status,
+            Pageable pageable,
+            SchoolAdminProfile admin) {
 
-public Page<StudentRequestResponseDto> getSchoolRequests(
-     EnrollmentStatus status,
-     Pageable pageable,
-     SchoolAdminProfile admin) {
+        School school = admin.getSchool();
 
- School school = admin.getSchool();
+        Page<StudentRequest> requests = (status != null)
+            ? studentRequestRepository.findBySchoolAndStatus(school, status, pageable)
+            : studentRequestRepository.findAllBySchool(school, pageable);
 
- Page<StudentRequest> requests = (status != null)
-     ? studentRequestRepository.findBySchoolAndStatus(school, status, pageable)
-     : studentRequestRepository.findAllBySchool(school, pageable);
+        return requests.map(this::mapRequestToResponse);
+    }
 
- return requests.map(this::mapRequestToResponse);
-}
+    // ===== SCHOOL ADMIN — view requests for a specific module =====
 
-//===== SCHOOL ADMIN — view requests for a specific module =====
+    public List<StudentRequestResponseDto> getRequestsByModule(
+            Long moduleId,
+            EnrollmentStatus status,
+            SchoolAdminProfile admin) {
 
-public List<StudentRequestResponseDto> getRequestsByModule(
-     Long moduleId,
-     EnrollmentStatus status,
-     SchoolAdminProfile admin) {
+        CourseModule module = moduleRepository.findById(moduleId)
+            .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + moduleId));
 
- CourseModule module = moduleRepository.findById(moduleId)
-     .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + moduleId));
+        if (!module.getSchool().getId().equals(admin.getSchool().getId()))
+            throw new AccessDeniedException("Module does not belong to your school");
 
- if (!module.getSchool().getId().equals(admin.getSchool().getId()))
-     throw new AccessDeniedException("Module does not belong to your school");
+        List<StudentRequest> requests = (status != null)
+            ? studentRequestRepository.findByModuleAndStatus(module, status)
+            : studentRequestRepository.findByModuleAndStatus(module, EnrollmentStatus.PENDING);
 
- List<StudentRequest> requests = (status != null)
-     ? studentRequestRepository.findByModuleAndStatus(module, status)
-     : studentRequestRepository.findByModuleAndStatus(module, EnrollmentStatus.PENDING);
+        return requests.stream().map(this::mapRequestToResponse).toList();
+    }
 
- return requests.stream().map(this::mapRequestToResponse).toList();
-}
+    // ===== SCHOOL ADMIN — count pending requests (dashboard badge) =====
 
-//===== SCHOOL ADMIN — count pending requests (dashboard badge) =====
+    public long countPendingRequests(SchoolAdminProfile admin) {
+        return studentRequestRepository.countPendingBySchool(admin.getSchool());
+    }
 
-public long countPendingRequests(SchoolAdminProfile admin) {
- return studentRequestRepository.countPendingBySchool(admin.getSchool());
-}
+    // ===== MAPPING =====
 
-//===== MAPPING =====
+    private StudentRequestResponseDto mapRequestToResponse(StudentRequest sr) {
+        StudentProfile student = sr.getStudent();
+        CourseModule module = sr.getModule();
 
-private StudentRequestResponseDto mapRequestToResponse(StudentRequest sr) {
- StudentProfile student = sr.getStudent();
- CourseModule module = sr.getModule();
+        return StudentRequestResponseDto.builder()
+            .id(sr.getId())
+            // student
+            .studentId(student.getId())
+            .studentFullName(student.getUser().getFullName())
+            .studentEmail(student.getUser().getEmail())
+            .studentLevel(student.getLevel())
+            .parentName(student.getParentName())
+            .parentPhone(student.getParentPhone())
+            // module
+            .moduleId(module.getId())
+            .moduleName(module.getName())
+            .subjectName(module.getSubject().getName())
+            .level(module.getLevel())
+            .monthlyPrice(module.getMonthlyprice())
+            // request
+            .status(sr.getStatus())
+            .createdAt(sr.getCreatedAt())
+            .reviewedAt(sr.getReviewedAt())
+            .reviewComment(sr.getReviewComment())
+            .build();
+    }
 
- return StudentRequestResponseDto.builder()
-     .id(sr.getId())
-     // student
-     .studentId(student.getId())
-     .studentFullName(student.getUser().getFullName())
-     .studentEmail(student.getUser().getEmail())
-     .studentLevel(student.getLevel())
-     .parentName(student.getParentName())
-     .parentPhone(student.getParentPhone())
-     // module
-     .moduleId(module.getId())
-     .moduleName(module.getName())
-     .subjectName(module.getSubject().getName())
-     .level(module.getLevel())
-     .monthlyPrice(module.getMonthlyprice())
-     // request
-     .status(sr.getStatus())
-     .createdAt(sr.getCreatedAt())
-     .reviewedAt(sr.getReviewedAt())
-     .reviewComment(sr.getReviewComment())
-     .build();
-}
-	    /* =========================================================
-	       4) STUDENT CANCEL
-	       ========================================================= */
+    // ===== STUDENT CANCEL =====
 
-	    public void cancelEnrollment(Long enrollmentId, User studentUser) throws  AccessDeniedException{
+    public void cancelEnrollment(Long enrollmentId, User studentUser) throws AccessDeniedException {
 
-	        if(studentUser.getRole() != Role.STUDENT)
-	            throw new AccessDeniedException("Only student");
+        if (studentUser.getRole() != Role.STUDENT)
+            throw new AccessDeniedException("Only student");
 
-	        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
-	                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
 
-	        if(!enrollment.getStudent().getUser().getId().equals(studentUser.getId()))
-	            throw new AccessDeniedException("Not your enrollment");
+        if (!enrollment.getStudent().getUser().getId().equals(studentUser.getId()))
+            throw new AccessDeniedException("Not your enrollment");
 
-	        if(!enrollment.getStatus().equals(EnrollmentStatus.PENDING))
-	            throw new IllegalStateException("Cannot cancel approved enrollment");
+        if (!enrollment.getStatus().equals(EnrollmentStatus.PENDING))
+            throw new IllegalStateException("Cannot cancel approved enrollment");
 
-	        enrollment.setStatus(EnrollmentStatus.CANCELLED);
-	    }
+        enrollment.setStatus(EnrollmentStatus.CANCELLED);
+    }
 
-
-	    private EnrollmentResponseDto mapToResponse(Enrollment e) {
-	        return EnrollmentResponseDto.builder()
-	            .id(e.getId())
-	            .ModuleId(e.getModule().getId())
-	            .moduleName(e.getModule().getName())
-	            .subjectName(e.getModule().getSubject().getName())
-	            .teacherName(e.getModule().getTeacher().getUser().getFullName())
-	            .status(e.getStatus())
-	            .startDate(e.getStartDate())
-	            .endDate(e.getEndDate())
-	            .student(e.getStudent())
-	            .monthlyPrice(e.getMonthlyPrice())
-	            .build();
-	    }
-
-
-	
-	
-
-
+    private EnrollmentResponseDto mapToResponse(Enrollment e) {
+        return EnrollmentResponseDto.builder()
+            .id(e.getId())
+            .ModuleId(e.getModule().getId())
+            .moduleName(e.getModule().getName())
+            .subjectName(e.getModule().getSubject().getName())
+            .teacherName(e.getModule().getTeacher().getUser().getFullName())
+            .status(e.getStatus())
+            .startDate(e.getStartDate())
+            .endDate(e.getEndDate())
+            .student(e.getStudent())
+            .monthlyPrice(e.getMonthlyPrice())
+            .build();
+    }
 }

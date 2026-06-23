@@ -73,20 +73,41 @@ public class TeacherService {
     }
 
   
-    public List<TeacherResponseDto> getTeachersBySchool(SchoolAdminProfile schoolAdmin) {
-
-        School school = schoolAdmin.getSchool();
-
-        return teacherRepository
-                .findAllBySchool(school)
-                .stream()
-                .map(this::mapToResponse)
-                .toList();
-    }
+   public List<TeacherResponseDto> getTeachersBySchool(SchoolAdminProfile schoolAdmin) {
+    School school = schoolAdmin.getSchool();
+    return teacherRepository
+            .findAllBySchoolAndArchivedFalse(school)  // ← only active teachers
+            .stream()
+            .map(this::mapToResponse)
+            .toList();
+}
 
 
    
-    
+    public List<TeacherResponseDto> getArchivedTeachers(SchoolAdminProfile schoolAdmin) {
+    School school = schoolAdmin.getSchool();
+    return teacherRepository
+            .findAllBySchoolAndArchivedTrue(school)
+            .stream()
+            .map(this::mapToResponse)
+            .toList();
+}
+//0--------------archived--------------------------------------//
+@Transactional
+public void unarchiveTeacher(Long teacherId, SchoolAdminProfile admin) {
+    TeacherProfile profile = teacherRepository.findById(teacherId)
+        .orElseThrow(() -> new ResourceNotFoundException("Teacher not found: " + teacherId));
+
+    if (!profile.getSchool().getId().equals(admin.getSchool().getId()))
+        throw new AccessDeniedException("Teacher does not belong to your school");
+
+    User user = profile.getUser();
+    user.setEnabled(true);
+    userRepository.save(user);
+
+    profile.setArchived(false);
+    teacherRepository.save(profile);
+}
        
     //========================== Create Teacher Profile ================================
     @Transactional
@@ -169,15 +190,15 @@ public class TeacherService {
 	
 	// MAPPING TO RESPONSEDTO
     private TeacherResponseDto mapToResponse(TeacherProfile profile) {
-
-        return TeacherResponseDto.builder()
-                .id(profile.getId())
-                .fullName(profile.getUser().getFullName())
-                .email(profile.getUser().getEmail())
-                 .bio(profile.getBio())
-                .specialization(profile.getSpecialization())
-                 
-                .build();
-    }
+    return TeacherResponseDto.builder()
+            .id(profile.getId())
+            .fullName(profile.getUser().getFullName())
+            .email(profile.getUser().getEmail())
+            .bio(profile.getBio())
+            .specialization(profile.getSpecialization())
+            .schoolId(profile.getSchool() != null ? profile.getSchool().getId() : null)
+            .archived(profile.isArchived())
+            .build();
+}
 
 }

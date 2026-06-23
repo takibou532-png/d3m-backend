@@ -125,7 +125,7 @@ public class SessionService {
     	      .moduleId(session.getModule().getId())
     		  .date(session.getDate())
     		  .endTime(session.getEndTime())
-    		  .isArchived(session.isArchived())
+    		  .Archived(session.isArchived())
     		  .schoolId(session.getSchool().getId())
     		  .startTime(session.getStartTime()).build();
     		 
