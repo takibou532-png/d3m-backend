@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,7 @@ import com.menu.demo.Enums.AdminActionType;
 import com.menu.demo.Enums.SubscriptionStatus;
 import com.menu.demo.Exceptions.ResourceNotFoundException;
 import com.menu.demo.Models.School;
+import com.menu.demo.Models.SchoolAdminProfile;
 import com.menu.demo.Models.SuperAdminAction;
 import com.menu.demo.Models.User;
 import com.menu.demo.Repositories.EnrollmentRepository;
@@ -57,6 +59,13 @@ public class SchoolService {
             .findAllBySubscriptionStatus(SubscriptionStatus.ACTIVE).stream()
             .map(this::mapSchoolToResponse)
             .toList();
+    }
+    
+//    ================GET SCHOOL BY ADMIN
+    public SchoolResponseDto getSchoolByAdmin(SchoolAdminProfile admin) {
+    	
+    School school=schoolRepository.findSchoolBySchoolAdminProfile(admin) .orElseThrow(() -> new ResourceNotFoundException("no school is linked to that user"));
+    return mapSchoolToResponse(school);
     }
 
 

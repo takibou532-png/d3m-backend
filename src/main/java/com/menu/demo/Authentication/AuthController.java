@@ -25,10 +25,12 @@ import com.menu.demo.Repositories.SchoolAdminProfileRepository;
 import com.menu.demo.Repositories.TeacherRepository;
 import com.menu.demo.Repositories.UserRepository;
 import com.menu.demo.SecurityJwt.JwtUtill;
+import com.menu.demo.Services.PasswordResetService;
 import com.menu.demo.Services.UserService;
 
-import Dto.StudentRegistrationRequest;
-import Dto.StudentResponseDto;
+import Dto.ForgotPasswordRequest;
+import Dto.ResetPasswordRequest;
+import Dto.VerifyOtpRequest;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -46,6 +48,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final SchoolAdminProfileRepository schoolAdminProfileRepository;
     private final TeacherRepository teacherRepository;
+    private final PasswordResetService passwordResetService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthenticationRequest loginRequest, HttpServletResponse response) {
@@ -161,5 +164,33 @@ public class AuthController {
         }
 
         return ResponseEntity.ok(info);
+    }
+    
+    
+    // ── STEP 1: Request OTP ──────────────────────────────────────
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(
+            @RequestBody ForgotPasswordRequest request) {
+
+        passwordResetService.sendOtp(request);
+
+   
+        return ResponseEntity.ok(Map.of(
+            "message", "If this email is registered, an OTP has been sent."
+        ));
+    }
+
+    // ── STEP 2: Verify OTP → get reset token ────────────────────
+    @PostMapping("/verify-otp")
+    public ResponseEntity<?> verifyOtp(
+            @RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(passwordResetService.verifyOtp(request));
+    }
+    // ── STEP 3: Set new password ─────────────────────────────────
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(
+            @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request);
+        return ResponseEntity.ok(Map.of("message", "Password reset successfully."));
     }
 }

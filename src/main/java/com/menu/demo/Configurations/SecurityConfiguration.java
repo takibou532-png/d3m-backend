@@ -47,7 +47,9 @@ public class SecurityConfiguration {
                 .requestMatchers(HttpMethod.POST, "/api/students/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/school-requests").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/modules/browse").permitAll()
-
+                .requestMatchers("/auth/forgot-password").permitAll()
+                .requestMatchers("/auth/verify-otp").permitAll()
+                .requestMatchers("/auth/reset-password").permitAll()
                 // ── Super admin only ──────────────────────────────────────
                 .requestMatchers("/api/platform/**").hasRole("SUPER_ADMIN")
                 .requestMatchers("/api/school-requests/pending").hasRole("SUPER_ADMIN")

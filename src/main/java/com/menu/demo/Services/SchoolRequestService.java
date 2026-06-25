@@ -115,8 +115,8 @@ public class SchoolRequestService {
             .commune(request.getCommune())
             .address(request.getAddress())
          
-            .subscriptionStatus(SubscriptionStatus.TRIAL)              // 30-day trial
-            .subscriptionExpiresAt(LocalDate.now().plusDays(30))
+            .subscriptionStatus(SubscriptionStatus.TRIAL)              
+            .subscriptionExpiresAt(LocalDate.now().plusDays(7))
             .build();
 
         schoolRepository.save(school);

@@ -32,6 +32,21 @@ public class JwtUtill {
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+ // Add this method alongside generateAccessToken and generateRefreshToken
+    public String generatePasswordResetToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("type", "reset");              // ← new type
+        return createToken(claims, userDetails.getUsername(), 1000 * 60 * 15); // 15 min
+    }
+
+    // Add this validation method
+    public boolean isPasswordResetToken(String token) {
+        try {
+            return "reset".equals(extractTokenType(token));
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     // ---------- ACCESS TOKEN ----------
     public String generateAccessToken(UserDetails userDetails) {
