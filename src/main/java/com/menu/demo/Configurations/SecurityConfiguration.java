@@ -43,7 +43,8 @@ public class SecurityConfiguration {
 
                 // ── Public endpoints ──────────────────────────────────────
                 .requestMatchers("/auth/login", "/auth/refresh").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/schools").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/schools/browse").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/schools/*/detail").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/students/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/school-requests").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/modules/browse").permitAll()

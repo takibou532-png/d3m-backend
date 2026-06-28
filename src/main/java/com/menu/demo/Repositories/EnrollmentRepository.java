@@ -29,7 +29,14 @@ public interface EnrollmentRepository extends JpaRepository < Enrollment , Long>
  boolean existsByStudentAndModule(StudentProfile student, CourseModule module);
 
  
-
+//Count active students in a school
+@Query("""
+  SELECT COUNT(DISTINCT e.student)
+  FROM Enrollment e
+  WHERE e.module.school.id = :schoolId
+  AND e.status = 'ACCEPTED'
+""")
+long countActiveStudentsBySchoolId(@Param("schoolId") Long schoolId);
 
 
 

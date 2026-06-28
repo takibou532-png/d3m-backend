@@ -19,4 +19,5 @@ public interface TeacherRepository extends JpaRepository<TeacherProfile, Long>{
       List<TeacherProfile> findAllBySchoolAndArchivedFalse(School school);
       List<TeacherProfile> findAllBySchoolAndArchivedTrue(School school);
       List<TeacherProfile> findAllByArchivedFalseAndPercentageGreaterThan(BigDecimal percentage);
+      long countBySchoolAndArchivedFalse(School school);
 }

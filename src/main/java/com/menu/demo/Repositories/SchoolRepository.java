@@ -17,6 +17,8 @@ import com.menu.demo.Models.SchoolAdminProfile;
 @Repository
 public interface SchoolRepository extends JpaRepository <School , Long> {
 	   List<School> findAllBySubscriptionStatus(SubscriptionStatus status);
+	   
+	   List<School> findAllBySubscriptionStatusIn(List<SubscriptionStatus> statuses);
 
 	    Page<School> findAllBySubscriptionStatusNot(SubscriptionStatus status, Pageable pageable);
 

@@ -19,6 +19,8 @@ import com.menu.demo.Models.User;
 import com.menu.demo.Repositories.SchoolAdminProfileRepository;
 import com.menu.demo.Services.SchoolService;
 
+import Dto.SchoolBrowseCardDto;
+import Dto.SchoolDetailResponseDto;
 import Dto.SchoolResponseDto;
 import lombok.RequiredArgsConstructor;
 @RestController
@@ -34,8 +36,9 @@ public class SchoolController {
     public ResponseEntity<Page<SchoolResponseDto>> getAll(Pageable pageable) {
         return ResponseEntity.ok(schoolService.getAllSchools(pageable));
     }
-    @GetMapping
-    public ResponseEntity<List<SchoolResponseDto>> getAllActive() {
+   
+    @GetMapping("/browse")
+    public ResponseEntity<List<SchoolBrowseCardDto>> browseSchools() {
         return ResponseEntity.ok(schoolService.getAllActiveSchools());
     }
 
@@ -43,6 +46,12 @@ public class SchoolController {
     @GetMapping("/{id}")
     public ResponseEntity<SchoolResponseDto> getById(@PathVariable Long id) {
         return ResponseEntity.ok(schoolService.getSchoolById(id));
+    }
+//    get school details by id for the student =T=
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<SchoolDetailResponseDto> getSchoolDetail(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(schoolService.getSchoolDetail(id));
     }
 
     // Super admin suspends a school (disables admin login)

@@ -4,21 +4,31 @@ package com.menu.demo.Services;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import com.menu.demo.Enums.AdminActionType;
 import com.menu.demo.Enums.SubscriptionStatus;
 import com.menu.demo.Exceptions.ResourceNotFoundException;
+import com.menu.demo.Models.CourseModule;
+import com.menu.demo.Models.ModuleSchedule;
 import com.menu.demo.Models.School;
 import com.menu.demo.Models.SchoolAdminProfile;
+import com.menu.demo.Models.Subject;
 import com.menu.demo.Models.SuperAdminAction;
+import com.menu.demo.Models.TeacherProfile;
 import com.menu.demo.Models.User;
+import com.menu.demo.Repositories.CourseModuleRepository;
 import com.menu.demo.Repositories.EnrollmentRepository;
 import com.menu.demo.Repositories.InvoiceRepository;
 import com.menu.demo.Repositories.SchoolAdminProfileRepository;
@@ -27,8 +37,11 @@ import com.menu.demo.Repositories.SuperAdminActionRepository;
 import com.menu.demo.Repositories.TeacherRepository;
 import com.menu.demo.Repositories.UserRepository;
 
-
+import Dto.ModuleScheduleViewDto;
+import Dto.SchoolBrowseCardDto;
+import Dto.SchoolDetailResponseDto;
 import Dto.SchoolResponseDto;
+import Dto.TeacherWithSubjectsDto;
 import jakarta.transaction.Transactional;
 
 import lombok.RequiredArgsConstructor;
@@ -37,7 +50,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class SchoolService {
-
+	private final CourseModuleRepository   moduleRepository;
     private final SchoolRepository schoolRepository;
     private final SchoolAdminProfileRepository adminProfileRepository;
     private final UserRepository userRepository;
@@ -54,10 +67,21 @@ public class SchoolService {
             .map(this::mapSchoolToResponse);
     }
     
-    public List<SchoolResponseDto> getAllActiveSchools() {
+    public List<SchoolBrowseCardDto> getAllActiveSchools() {
         return schoolRepository
-            .findAllBySubscriptionStatus(SubscriptionStatus.ACTIVE).stream()
-            .map(this::mapSchoolToResponse)
+            .findAllBySubscriptionStatusIn(
+                List.of(SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL))
+            .stream()
+            .map(school -> SchoolBrowseCardDto.builder()
+                .schoolId(school.getId())
+                .schoolName(school.getSchoolName())
+                .email(school.getEmail())
+                .phone(school.getPhone())
+                .wilaya(school.getWilaya())
+                .commune(school.getCommune())
+                .totalModules(moduleRepository.countBySchoolAndArchivedFalse(school))
+                .totalTeachers(teacherRepository.countBySchoolAndArchivedFalse(school))
+                .build())
             .toList();
     }
     
@@ -76,6 +100,10 @@ public class SchoolService {
             .orElseThrow(() -> new ResourceNotFoundException("School not found: " + schoolId));
         return mapSchoolToResponse(school);
     }
+    
+
+      
+    
 
     // ======== SUSPEND SCHOOL ========
 
@@ -166,5 +194,105 @@ public class SchoolService {
             .targetEntityType(entityType)
             .comment(comment)
             .build());
+    }
+    
+    public SchoolDetailResponseDto getSchoolDetail(Long schoolId) {
+
+        // 1. Load school
+        School school = schoolRepository.findById(schoolId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "School not found: " + schoolId));
+
+        if (school.getSubscriptionStatus() == SubscriptionStatus.SUSPENDED ||
+            school.getSubscriptionStatus() == SubscriptionStatus.EXPIRED)
+            throw new AccessDeniedException("This school is not available.");
+
+        // 2. Load teachers with their subjects
+        List<TeacherProfile> teachers =
+            teacherRepository.findAllBySchoolAndArchivedFalse(school);
+
+        List<TeacherWithSubjectsDto> teacherDtos = teachers.stream()
+            .map(t -> TeacherWithSubjectsDto.builder()
+                .teacherId(t.getId())
+                .fullName(t.getUser().getFullName())
+                .specialization(t.getSpecialization())
+                .bio(t.getBio())
+                .subjectNames(
+                    // subjects taught by this teacher in this school
+                    t.getSubjects().stream()
+                        .filter(s -> s.getSchool().getId().equals(schoolId)
+                                  && !s.isArchived())
+                        .map(Subject::getName)
+                        .toList()
+                )
+                .build())
+            .toList();
+
+        // 3. Load modules with schedules, group by day
+        List<CourseModule> modules =
+            moduleRepository.findAllWithSchedulesBySchoolId(schoolId);
+
+        // Count enrollments per module
+        Map<Long, Long> enrollmentCounts = new HashMap<>();
+        for (CourseModule m : modules) {
+            long count = enrollmentRepository.countActiveByModule(m);
+            enrollmentCounts.put(m.getId(), count);
+        }
+
+        // Expand each module into one entry per schedule day
+        // then group by day name
+        Map<String, List<ModuleScheduleViewDto>> modulesByDay = new TreeMap<>();
+
+        for (CourseModule module : modules) {
+            long enrolled = enrollmentCounts.getOrDefault(module.getId(), 0L);
+
+            for (ModuleSchedule schedule : module.getSchedules()) {
+
+                ModuleScheduleViewDto dto = ModuleScheduleViewDto.builder()
+                    .moduleId(module.getId())
+                    .moduleName(module.getName())
+                    .subjectName(module.getSubject().getName())
+                    .teacherName(module.getTeacher().getUser().getFullName())
+                    .level(module.getLevel())
+                    .day(schedule.getDay().name())
+                    .startTime(schedule.getStartTime().toString())
+                    .endTime(schedule.getEndTime().toString())
+                    .maxStudents(module.getMaxStudents())
+                    .enrolledCount(enrolled)
+                    .full(enrolled >= module.getMaxStudents())
+                    .monthlyPrice(module.getMonthlyprice())
+                    .build();
+
+                // Group by day
+                modulesByDay
+                    .computeIfAbsent(schedule.getDay().name(), k -> new ArrayList<>())
+                    .add(dto);
+            }
+        }
+
+        // Sort each day's modules by start time
+        modulesByDay.values().forEach(list ->
+            list.sort(Comparator.comparing(ModuleScheduleViewDto::getStartTime)));
+
+        // 4. Stats
+        long totalStudents =
+            enrollmentRepository.countActiveStudentsBySchoolId(schoolId);
+
+        return SchoolDetailResponseDto.builder()
+            .schoolId(school.getId())
+            .schoolName(school.getSchoolName())
+            .ownerName(school.getOwnerName())
+            .phone(school.getPhone())
+            .email(school.getEmail())
+            .address(school.getAddress())
+            .wilaya(school.getWilaya())
+            .commune(school.getCommune())
+            .subscriptionStatus(school.getSubscriptionStatus())
+            .totalTeachers(teachers.size())
+            .totalModules(modules.size())
+            .totalStudents(totalStudents)
+            .teachers(teacherDtos)
+            .modulesByDay(modulesByDay)
+            .build();
     }
 }

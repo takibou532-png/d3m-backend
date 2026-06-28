@@ -21,6 +21,7 @@ public interface CourseModuleRepository extends JpaRepository <CourseModule , Lo
 	   List<CourseModule> findAllBySchoolAndArchivedFalse(School school);
        Optional<CourseModule> findByName(String name);
 	    List<CourseModule> findAllBySchoolAndLevelAndArchivedFalse(School school, String level);
+	    long countBySchoolAndArchivedFalse(School school);
 
 	    // Check teacher conflict across modules on same day/time
 	    @Query("""
@@ -54,5 +55,18 @@ public interface CourseModuleRepository extends JpaRepository <CourseModule , Lo
 	        @Param("startTime") LocalTime startTime,
 	        @Param("endTime") LocalTime endTime
 	    );
+	    
+//	    GET MODULES OF A SCHOOL  WITH ITS SCHEDULE
+	    @Query("""
+	    	    SELECT DISTINCT cm FROM CourseModule cm
+	    	    LEFT JOIN FETCH cm.schedules
+	    	    LEFT JOIN FETCH cm.subject
+	    	    LEFT JOIN FETCH cm.teacher t
+	    	    LEFT JOIN FETCH t.user
+	    	    WHERE cm.school.id = :schoolId
+	    	    AND cm.archived = false
+	    	    ORDER BY cm.level
+	    	""")
+	    	List<CourseModule> findAllWithSchedulesBySchoolId(@Param("schoolId") Long schoolId);
 
 }
