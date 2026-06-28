@@ -4,9 +4,7 @@ import lombok.Data;
 
 @Data
 public class SubjectrequestDto {
-    private Long schoolId;
     private String name;
     private String description;
-    private boolean isArchived;
-
+    private Long teacherId;   // optional — assign teacher at subject creation
 }
