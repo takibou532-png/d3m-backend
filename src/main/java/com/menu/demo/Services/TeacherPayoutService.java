@@ -7,6 +7,7 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -38,17 +39,12 @@ public class TeacherPayoutService {
     private final InvoiceRepository invoiceRepository;
 
     // ======== SCHEDULER — runs 2nd of every month at midnight ========
-    // Calculates payouts for the PREVIOUS month
-    // Runs after the 1st (when student invoices are generated and some already paid)
 
     @Scheduled(cron = "0 0 0 2 * *")
     public void calculateMonthlyPayouts() {
 
-        // Calculate for last month — gives full month for payments to come in
         YearMonth previousMonth = YearMonth.now().minusMonths(1);
 
-        // Process every school separately
-        // Get all non-archived teachers with a percentage > 0
         List<TeacherProfile> eligibleTeachers =
             teacherRepository.findAllByArchivedFalseAndPercentageGreaterThan(BigDecimal.ZERO);
 
@@ -56,22 +52,16 @@ public class TeacherPayoutService {
 
         for (TeacherProfile teacher : eligibleTeachers) {
 
-            // Don't recalculate if already done
             if (payoutRepository.existsByTeacherAndPeriod(teacher, previousMonth))
                 continue;
 
-            // How much did students pay for this teacher's modules last month?
             BigDecimal revenue = invoiceRepository
                 .sumPaidByTeacherAndPeriod(teacher, previousMonth);
 
-            // Skip teachers with zero revenue (no point creating a 0 payout)
             if (revenue.compareTo(BigDecimal.ZERO) == 0)
                 continue;
 
-            // Snapshot the percentage at calculation time
             BigDecimal percentage = teacher.getPercentage();
-
-            // Calculate payout: revenue × percentage / 100
             BigDecimal payoutAmount = revenue
                 .multiply(percentage)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -91,7 +81,6 @@ public class TeacherPayoutService {
     }
 
     // ======== SCHOOL ADMIN — manually trigger recalculation for a month ========
-    // Useful if late invoice payments come in after the 2nd
 
     public SchoolPayoutSummaryDto recalculatePayoutsForMonth(
             YearMonth period,
@@ -118,11 +107,9 @@ public class TeacherPayoutService {
                 .multiply(percentage)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-            // Update if exists, create if not
             payoutRepository.findByTeacherAndPeriod(teacher, period)
                 .ifPresentOrElse(
                     existing -> {
-                        // Only recalculate if not yet paid
                         if (existing.getStatus() == PayoutStatus.PENDING) {
                             existing.setTotalModuleRevenue(revenue);
                             existing.setPercentage(percentage);
@@ -172,7 +159,7 @@ public class TeacherPayoutService {
             .build();
     }
 
-    // ======== SCHOOL ADMIN — mark payout as paid to teacher ========
+    // ======== SCHOOL ADMIN — mark payout as paid ========
 
     public TeacherPayoutResponseDto markPayoutAsPaid(Long payoutId, SchoolAdminProfile admin) {
 
@@ -212,10 +199,26 @@ public class TeacherPayoutService {
         teacher.setPercentage(newPercentage);
         teacherRepository.save(teacher);
 
-        // Note: already-calculated payouts keep their snapshot percentage
-        // Only future payouts will use the new percentage
-
         return mapTeacherToResponse(teacher);
+    }
+
+    // ======== SCHOOL ADMIN — latest payout for a teacher (for edit modal) ========
+
+    public TeacherPayoutResponseDto getLatestPayoutForTeacher(Long teacherId, SchoolAdminProfile admin) {
+
+        TeacherProfile teacher = teacherRepository.findById(teacherId)
+            .orElseThrow(() -> new ResourceNotFoundException("Teacher not found: " + teacherId));
+
+        if (!teacher.getSchool().getId().equals(admin.getSchool().getId()))
+            throw new AccessDeniedException("Teacher does not belong to your school");
+
+        List<TeacherPayout> latest =
+            payoutRepository.findByTeacherOrderByPeriodDesc(teacher, PageRequest.of(0, 1));
+
+        if (latest.isEmpty())
+            return null; // no payout history yet — frontend handles this gracefully
+
+        return mapToResponse(latest.get(0));
     }
 
     // ======== TEACHER — view their own payouts ========
@@ -232,7 +235,7 @@ public class TeacherPayoutService {
             .toList();
     }
 
-    // ======== TEACHER — view revenue breakdown for a specific month ========
+    // ======== TEACHER — view payout for a specific month ========
 
     public TeacherPayoutResponseDto getMyPayoutForMonth(YearMonth period, User currentUser) {
 
@@ -271,7 +274,7 @@ public class TeacherPayoutService {
             .bio(t.getBio())
             .schoolId(t.getSchool().getId())
             .archived(t.isArchived())
-           
+            .percentage(t.getPercentage())   
             .build();
     }
 }

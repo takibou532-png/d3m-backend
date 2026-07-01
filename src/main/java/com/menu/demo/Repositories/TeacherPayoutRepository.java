@@ -5,6 +5,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,9 +20,13 @@ public interface TeacherPayoutRepository extends JpaRepository<TeacherPayout, Lo
 
     List<TeacherPayout> findAllByTeacherOrderByPeriodDesc(TeacherProfile teacher);
 
+    // Used by getLatestPayoutForTeacher — fetches only the most recent 1
+    List<TeacherPayout> findByTeacherOrderByPeriodDesc(TeacherProfile teacher, Pageable pageable);
+
     boolean existsByTeacherAndPeriod(TeacherProfile teacher, YearMonth period);
 
-    // Total pending payouts for a school in a period
+    Optional<TeacherPayout> findByTeacherAndPeriod(TeacherProfile teacher, YearMonth period);
+
     @Query("""
         SELECT COALESCE(SUM(p.payoutAmount), 0)
         FROM TeacherPayout p
@@ -34,7 +39,6 @@ public interface TeacherPayoutRepository extends JpaRepository<TeacherPayout, Lo
         @Param("period") YearMonth period
     );
 
-    // Total paid payouts for a school in a period
     @Query("""
         SELECT COALESCE(SUM(p.payoutAmount), 0)
         FROM TeacherPayout p
@@ -46,5 +50,4 @@ public interface TeacherPayoutRepository extends JpaRepository<TeacherPayout, Lo
         @Param("school") School school,
         @Param("period") YearMonth period
     );
-    Optional<TeacherPayout> findByTeacherAndPeriod(TeacherProfile teacher, YearMonth period);
 }

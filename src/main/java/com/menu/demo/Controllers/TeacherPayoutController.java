@@ -34,7 +34,6 @@ public class TeacherPayoutController {
     private final TeacherPayoutService payoutService;
     private final SchoolAdminProfileRepository adminProfileRepository;
 
-    // School admin — view payout summary for a month
     // GET /api/payouts?period=2025-11
     @GetMapping
     public ResponseEntity<SchoolPayoutSummaryDto> getPayoutSummary(
@@ -44,7 +43,6 @@ public class TeacherPayoutController {
             payoutService.getPayoutSummaryForMonth(period, resolveAdmin(currentUser)));
     }
 
-    // School admin — manually recalculate payouts for a month
     // POST /api/payouts/recalculate?period=2025-11
     @PostMapping("/recalculate")
     public ResponseEntity<SchoolPayoutSummaryDto> recalculate(
@@ -54,7 +52,6 @@ public class TeacherPayoutController {
             payoutService.recalculatePayoutsForMonth(period, resolveAdmin(currentUser)));
     }
 
-    // School admin — mark a payout as paid to the teacher
     // POST /api/payouts/{id}/pay
     @PostMapping("/{id}/pay")
     public ResponseEntity<TeacherPayoutResponseDto> markAsPaid(
@@ -64,7 +61,6 @@ public class TeacherPayoutController {
             payoutService.markPayoutAsPaid(id, resolveAdmin(currentUser)));
     }
 
-    // School admin — update a teacher's percentage
     // PATCH /api/payouts/teacher/{teacherId}/percentage?value=20
     @PatchMapping("/teacher/{teacherId}/percentage")
     public ResponseEntity<TeacherResponseDto> updatePercentage(
@@ -75,7 +71,6 @@ public class TeacherPayoutController {
             payoutService.updateTeacherPercentage(teacherId, value, resolveAdmin(currentUser)));
     }
 
-    // Teacher — view own payouts history
     // GET /api/payouts/mine
     @GetMapping("/mine")
     public ResponseEntity<List<TeacherPayoutResponseDto>> getMyPayouts(
@@ -83,13 +78,28 @@ public class TeacherPayoutController {
         return ResponseEntity.ok(payoutService.getMyPayouts(currentUser));
     }
 
-    // Teacher — view own payout for a specific month
     // GET /api/payouts/mine/month?period=2025-11
     @GetMapping("/mine/month")
     public ResponseEntity<TeacherPayoutResponseDto> getMyPayoutForMonth(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth period,
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(payoutService.getMyPayoutForMonth(period, currentUser));
+    }
+
+    // GET /api/payouts/teacher/{teacherId}/latest
+    // Used by the edit modal to show previous payout amount in DA
+    @GetMapping("/teacher/{teacherId}/latest")
+    public ResponseEntity<TeacherPayoutResponseDto> getLatestForTeacher(
+            @PathVariable Long teacherId,
+            @AuthenticationPrincipal User currentUser) {
+
+        TeacherPayoutResponseDto dto =
+            payoutService.getLatestPayoutForTeacher(teacherId, resolveAdmin(currentUser));
+
+        // 204 when no payout history — frontend shows "لا توجد دفعات بعد"
+        return dto != null
+            ? ResponseEntity.ok(dto)
+            : ResponseEntity.noContent().build();
     }
 
     private SchoolAdminProfile resolveAdmin(User user) {
