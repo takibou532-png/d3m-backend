@@ -67,4 +67,10 @@ public class StudentController {
         return adminProfileRepository.findByUser(user)
             .orElseThrow(() -> new ResourceNotFoundException("Admin profile not found"));
     }
+    @GetMapping
+public ResponseEntity<List<StudentResponseDto>> getAllStudents(
+        @AuthenticationPrincipal User currentUser) {
+    return ResponseEntity.ok(
+        studentService.getAllStudents(resolveAdmin(currentUser)));
+}
 }

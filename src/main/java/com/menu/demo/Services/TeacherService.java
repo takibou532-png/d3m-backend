@@ -184,9 +184,56 @@ public class TeacherService {
             .bio(profile.getBio())
             .specialization(profile.getSpecialization())
             .schoolId(profile.getSchool() != null ? profile.getSchool().getId() : null)
+            .percentage(profile.getPercentage()) 
             .archived(profile.isArchived())
             .subjectIds(subjectIds)
             .subjectNames(subjectNames)
             .build();
     }
+    // ========================== UPDATE TEACHER BY ID (Admin) ==========================
+
+@Transactional
+public TeacherResponseDto updateTeacherById(Long teacherId, TeacherRequestDto request, SchoolAdminProfile admin) {
+
+    TeacherProfile profile = teacherRepository.findById(teacherId)
+        .orElseThrow(() -> new ResourceNotFoundException("Teacher not found: " + teacherId));
+
+    // Make sure this teacher belongs to the admin's school
+    if (!profile.getSchool().getId().equals(admin.getSchool().getId()))
+        throw new AccessDeniedException("Teacher does not belong to your school");
+
+    User user = profile.getUser();
+
+    // Update name
+    if (request.getFullName() != null && !request.getFullName().isBlank())
+        user.setFullName(request.getFullName());
+
+    // Update email (check for conflicts first)
+    if (request.getEmail() != null && !request.getEmail().isBlank()
+            && !request.getEmail().equalsIgnoreCase(user.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail()))
+            throw new EmailAlreadyExistsException("Email already in use");
+        user.setEmail(request.getEmail());
+    }
+
+    // Update password only if a new one was provided
+    if (request.getPassword() != null && !request.getPassword().isBlank())
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+    userRepository.save(user);
+
+    // Update profile fields
+    if (request.getSpecialization() != null)
+        profile.setSpecialization(request.getSpecialization());
+
+    if (request.getBio() != null)
+        profile.setBio(request.getBio());
+
+    if (request.getPercentage() != null)
+        profile.setPercentage(request.getPercentage());
+
+    teacherRepository.save(profile);
+
+    return mapToResponse(profile);
+}
 }

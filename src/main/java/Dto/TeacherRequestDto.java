@@ -18,6 +18,7 @@ public class TeacherRequestDto {
     @DecimalMin("0.0")
     @DecimalMax("100.0")
     private BigDecimal percentage;
+      private Long subjectId;
 
 
 }

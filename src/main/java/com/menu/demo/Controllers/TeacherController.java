@@ -47,6 +47,16 @@ public class TeacherController {
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(teacherService.getTeachersBySchool(resolveAdmin(currentUser)));
     }
+    // School admin updates a teacher by ID
+@PutMapping("/{id}")
+public ResponseEntity<TeacherResponseDto> updateTeacher(
+        @PathVariable Long id,
+        @RequestBody TeacherRequestDto request,
+        @AuthenticationPrincipal User currentUser) {
+    return ResponseEntity.ok(
+        teacherService.updateTeacherById(id, request, resolveAdmin(currentUser))
+    );
+}
 
     // Teacher views their own profile
     @GetMapping("/profile")
@@ -91,4 +101,6 @@ public ResponseEntity<Void> unarchive(
     teacherService.unarchiveTeacher(id, resolveAdmin(currentUser));
     return ResponseEntity.noContent().build();
 }
+
+
 }

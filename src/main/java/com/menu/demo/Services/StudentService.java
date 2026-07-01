@@ -131,7 +131,12 @@ public class StudentService {
 
 
 
-  
+  public List<StudentResponseDto> getAllStudents(SchoolAdminProfile admin) {
+    return studentProfileRepository.findAllBySchool(admin.getSchool())
+        .stream()
+        .map(this::mapToResponse)
+        .toList();
+}
   
   
     

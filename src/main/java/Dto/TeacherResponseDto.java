@@ -1,5 +1,6 @@
 package Dto;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import lombok.Builder;
@@ -15,6 +16,7 @@ public class TeacherResponseDto {
     private String specialization;
     private boolean archived;
     private String bio;
+    private BigDecimal percentage; 
     private List<Long>   subjectIds;    // all subjects assigned to this teacher
     private List<String> subjectNames;  // for display in frontend
 }
