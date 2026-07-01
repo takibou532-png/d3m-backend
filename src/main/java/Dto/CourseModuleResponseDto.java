@@ -1,7 +1,10 @@
 package Dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+
+import com.menu.demo.Enums.PricingModel;
 
 import lombok.Builder;
 import lombok.Data;
@@ -23,4 +26,6 @@ public class CourseModuleResponseDto {
     private Integer enrolledCount;
     private List<ScheduleEntryDto> schedules;
     private boolean archived;
+    private PricingModel pricingModel;
+    private BigDecimal   pricePerSession;
 }

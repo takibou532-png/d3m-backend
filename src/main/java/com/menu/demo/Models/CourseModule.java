@@ -5,9 +5,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.menu.demo.Enums.PricingModel;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -50,6 +54,12 @@ public class CourseModule {
     private LocalDate periodEnd;
     private Integer maxStudents;
     private boolean archived;
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private PricingModel pricingModel = PricingModel.MONTHLY_FLAT;
+
+    
+    private BigDecimal pricePerSession;
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

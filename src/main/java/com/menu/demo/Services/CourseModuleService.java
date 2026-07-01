@@ -1,6 +1,7 @@
 package com.menu.demo.Services;
 
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
+import com.menu.demo.Enums.PricingModel;
 import com.menu.demo.Exceptions.ResourceNotFoundException;
 import com.menu.demo.Models.ClassRoom;
 import com.menu.demo.Models.CourseModule;
@@ -105,7 +107,12 @@ import lombok.RequiredArgsConstructor;
 	            if (moduleRepository.existsClassroomScheduleConflict(
 	                    classroom, entry.getDay(), entry.getStartTime(), entry.getEndTime()))
 	                throw new IllegalStateException(
-	                    "Classroom already booked on " + entry.getDay() + " at that time");
+	               
+	                		"Classroom already booked on " + entry.getDay() + " at that time");
+	        }
+	        if (request.getPricingModel() == PricingModel.PER_SESSION) {
+	            if (request.getPricePerSession() == null || request.getPricePerSession().compareTo(BigDecimal.ZERO) <= 0)
+	                throw new IllegalArgumentException("pricePerSession is required for PER_SESSION pricing");
 	        }
 
 	        // Build module
@@ -120,6 +127,10 @@ import lombok.RequiredArgsConstructor;
 	            .periodEnd(request.getPeriodEnd())
 	            .maxStudents(request.getMaxStudents())
 	            .archived(false)
+	            .pricingModel(request.getPricingModel() != null
+	            ? request.getPricingModel()
+	            : PricingModel.MONTHLY_FLAT)
+	            .pricePerSession(request.getPricePerSession())
 	            .build();
 
 	        // Build schedules and attach to module

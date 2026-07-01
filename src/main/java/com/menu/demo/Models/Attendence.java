@@ -40,6 +40,7 @@ public class Attendence {
     private AttendenceStatus status;
     @Builder.Default
     private LocalDateTime markedAt = LocalDateTime.now();
+    private String note;
 
   
 }

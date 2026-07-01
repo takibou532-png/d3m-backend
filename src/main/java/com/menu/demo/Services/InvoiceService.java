@@ -14,14 +14,17 @@ import org.springframework.stereotype.Service;
 
 import com.menu.demo.Enums.EnrollmentStatus;
 import com.menu.demo.Enums.InvoiceStatus;
+import com.menu.demo.Enums.PricingModel;
 import com.menu.demo.Enums.Role;
 import com.menu.demo.Exceptions.ResourceNotFoundException;
+import com.menu.demo.Models.CourseModule;
 import com.menu.demo.Models.Enrollment;
 import com.menu.demo.Models.Invoice;
 import com.menu.demo.Models.School;
 import com.menu.demo.Models.SchoolAdminProfile;
 import com.menu.demo.Models.StudentProfile;
 import com.menu.demo.Models.User;
+import com.menu.demo.Repositories.AttendanceRepository;
 import com.menu.demo.Repositories.EnrollmentRepository;
 import com.menu.demo.Repositories.InvoiceRepository;
 import com.menu.demo.Repositories.SchoolRepository;
@@ -41,39 +44,58 @@ public class InvoiceService {
     private final EnrollmentRepository enrollmentRepository;
     private final SchoolRepository schoolRepository;
     private final StudentRepository studentRepository;
+    private final AttendanceRepository attendanceRepository;
 
     // ======== SCHEDULED JOB — runs at midnight on the 1st of every month ========
 
-    @Scheduled(cron = "0 0 0 1 * *")   // 1st of each month at 00:00
+    @Scheduled(cron = "0 0 0 1 * *")
     public void generateMonthlyInvoices() {
 
-        // Generate for the CURRENT month (just started)
-        YearMonth period = YearMonth.now();
-        LocalDate dueDate = period.atDay(10);   // due on the 10th
+        // Bill for the PREVIOUS month
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        LocalDate dueDate  = YearMonth.now().atDay(10);
 
-        // Get all active enrollments across all schools
-        List<Enrollment> activeEnrollments =
-            enrollmentRepository.findAllByStatus(EnrollmentStatus.ACCEPTED);
+        List<Enrollment> active = enrollmentRepository.findAllByStatus(EnrollmentStatus.ACCEPTED);
 
         List<Invoice> invoices = new ArrayList<>();
 
-        for (Enrollment enrollment : activeEnrollments) {
+        for (Enrollment enrollment : active) {
 
-            // Skip if already generated (safety check)
-            if (invoiceRepository.existsByEnrollmentAndPeriod(enrollment, period))
-                continue;
+            if (invoiceRepository.existsByEnrollmentAndPeriod(enrollment, previous)) continue;
 
-            // Skip if enrollment ended before this month
             if (enrollment.getEndDate() != null &&
-                enrollment.getEndDate().isBefore(period.atDay(1)))
-                continue;
+                enrollment.getEndDate().isBefore(previous.atDay(1))) continue;
+
+            CourseModule module = enrollment.getModule();
+            BigDecimal amount;
+
+            if (module.getPricingModel() == PricingModel.PER_SESSION) {
+
+                // Count how many sessions student was PRESENT in the previous month
+                long presentCount = attendanceRepository.countPresentByStudentAndModuleAndMonth(
+                    enrollment.getStudent(),
+                    module,
+                    previous.getYear(),
+                    previous.getMonthValue()
+                );
+
+                // Don't generate a zero invoice
+                if (presentCount == 0) continue;
+
+                amount = module.getPricePerSession()
+                    .multiply(BigDecimal.valueOf(presentCount));
+
+            } else {
+                // MONTHLY_FLAT — use fixed price
+                amount = enrollment.getMonthlyPrice();
+            }
 
             invoices.add(Invoice.builder()
                 .enrollment(enrollment)
                 .student(enrollment.getStudent())
-                .school(enrollment.getModule().getSchool())
-                .period(period)
-                .totalAmount(enrollment.getMonthlyPrice())   // flat rate from enrollment
+                .school(module.getSchool())
+                .period(previous)
+                .totalAmount(amount)
                 .status(InvoiceStatus.PENDING)
                 .dueDate(dueDate)
                 .build());
@@ -81,7 +103,6 @@ public class InvoiceService {
 
         invoiceRepository.saveAll(invoices);
     }
-
     // ======== SCHEDULED JOB — marks overdue invoices every day at 1am ========
 
     @Scheduled(cron = "0 0 1 * * *")

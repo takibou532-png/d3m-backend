@@ -35,7 +35,7 @@ public class AttendenceService {
     private final SessionRepository sessionRepository;
     private final EnrollmentRepository enrollmentRepository;
 
-    // ======== TEACHER MARKS ATTENDANCE FOR A SESSION ========
+
 
     public List<AttendanceResponseDto> markAttendance(
             Long sessionId,
@@ -115,7 +115,7 @@ public class AttendenceService {
                 Attendence a = markedMap.get(student.getId());
                 return AttendanceResponseDto.builder()
                     .studentId(student.getId())
-                    .studentName(student.getUser().getFullName())
+                 
                     .status(a != null ? a.getStatus() : null)   // null = not marked yet
                
                     .markedAt(a != null ? a.getMarkedAt() : null)
@@ -156,7 +156,7 @@ public class AttendenceService {
     private AttendanceResponseDto mapToResponse(Attendence a) {
         return AttendanceResponseDto.builder()
             .studentId(a.getStudent().getId())
-            .studentName(a.getStudent().getUser().getFullName())
+       
             .status(a.getStatus())
             
             .markedAt(a.getMarkedAt())

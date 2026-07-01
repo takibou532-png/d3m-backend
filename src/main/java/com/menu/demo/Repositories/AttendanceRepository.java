@@ -61,4 +61,18 @@ public interface AttendanceRepository extends JpaRepository<Attendence, Long> {
         @Param("month") int month
     );
 
+
+    Optional<Attendence> findByStudentAndSession(StudentProfile student, Session session);
+
+   
+
+    // Any attendance marked for this session?
+    boolean existsBySession(Session session);
+
+ 
+ 
+
+
+ 
+
 }
